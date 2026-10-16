@@ -1,0 +1,12 @@
+{
+  "name": "kiki-blog-admin",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --port 8787",
+    "deploy": "wrangler deploy",
+    "test": "node --test test/*.test.mjs",
+    "check": "node --check worker.mjs && node --check public/admin.js"
+  },
+  "devDependencies": { "wrangler": "^4.0.0" }
+}

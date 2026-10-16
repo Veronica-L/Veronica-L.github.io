@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "node server.cjs",
     "start": "node server.cjs",
-    "check": "node --check app.js && node --check home-view.js && node --check diary-media.js && node --check diary-ui.js && node --check server.cjs && node --check scripts/build-pages.cjs",
+    "check": "node --check app.js && node --check home-view.js && node --check diary-media.js && node --check diary-ui.js && node --check content-client.js && node --check site-config.js && node --check admin/admin-gateway.js && node --check server.cjs && node --check scripts/build-pages.cjs && node --check backend/worker.mjs && node --check backend/public/admin.js",
+    "test": "node --test backend/test/*.test.mjs",
     "build": "node scripts/build-pages.cjs"
   }
 }

@@ -1,0 +1,59 @@
+# Kiki's Blog 管理后台
+
+- 公开网站：https://veronica-l.github.io/
+- 后台入口：https://veronica-l.github.io/admin/
+- 后台服务：https://kiki-blog-admin.kiki-blog-admin.workers.dev/admin
+
+## 使用
+
+1. 使用博客所有者的 GitHub 账号登录；其他账号无法读取或修改后台内容。
+2. 新建文章或日记，填写标题、日期、正文、分类和标签。
+3. 插图上传后仍为后台私有资源。保存草稿会把文字存入 Cloudflare D1，换设备登录后可以继续编辑。
+4. 点击「发布到网站」，将当前记录与引用的图片一起提交至 GitHub。页面会区分正在部署、部署成功和部署失败。
+5. 日记中的图片会自动出现在公开照片墙的「日记」相册；文章插图显示在正文中。
+6. 已有公开版本的内容可继续修改并保存草稿，直到再次发布，访客看到的仍为上一个公开版本。
+
+当前支持最近 500 条记录的后台列表；每篇正文最多 50000 字、12 张插图。上传前将图片缩放至最大宽度 1800 像素并重新编码为 1 MB 以内的 JPG。重新编码的图片不保留原文件名或原图 EXIF 元数据；透明背景会转为白色。原始照片不会上传。
+
+## 数据与隐私
+
+- 草稿、未发布图片和登录会话存放在 Cloudflare D1，数据库内容不进入 Git 仓库。
+- GitHub OAuth 使用 `public_repo` 权限；后台仅允许固定仓库，登录后还会核对所有者的数字账号 ID。
+- GitHub 访问令牌只在服务器端使用，并通过会话密钥加密存储；浏览器收到的是 Secure、HttpOnly、SameSite=Lax 会话 Cookie。
+- 「发布」意味着向公开仓库公开文字与引用图片。撤下仅移除网站内容索引，无法抹去 Git 历史、缓存或已公开的图片。
+- 旧版 localStorage / IndexedDB 中的记录不会自动上传；它们仍属于原浏览器和原网址，需要本人选择后手动迁移。
+- 页面中的模板示例内容仍保留，新发布内容会加入文章、日记、标签和归档；后台列表只管理从后台新建的内容。
+- 后台草稿可作为不公开的写作记录；当前没有单独的「私密日记」阅读页。请勿通过发布按钮提交私密内容。
+
+## 登录配置与部署
+
+运行环境：Node.js 24。网站部署到 GitHub Pages，后台部署到 Cloudflare Workers，私有数据使用 D1。
+
+`backend/wrangler.jsonc` 只包含非秘密设置与 D1 绑定。以下值必须设置为 Cloudflare Worker Secrets，不能写进源码、`.env`、提交或网页：
+
+- `GITHUB_CLIENT_SECRET`：GitHub OAuth App 的密钥。
+- `SESSION_SECRET`：至少 32 字符的随机会话加密密钥。更换后已有登录会话失效。
+
+OAuth App 的回调地址：
+
+```text
+https://kiki-blog-admin.kiki-blog-admin.workers.dev/auth/callback
+```
+
+首次部署：在 `backend` 目录安装锁文件对应依赖，使用 Wrangler 官方登录，再创建 D1 绑定并执行迁移。已配置的账号中更新后台可运行：
+
+```text
+npm ci --prefix backend
+npm run check
+npm test
+npm run build
+npm --prefix backend run deploy
+```
+
+数据库迁移使用 `wrangler d1 migrations apply kiki-blog-admin-db --remote`；不会在每次请求中修改数据库结构。Secret 在 Cloudflare 控制台设置后，常规 Wrangler 部署会保留它们。后台源代码变更需要单独部署 Worker，GitHub Pages 工作流只部署公开页面。
+
+## 验证
+
+`npm test` 使用真实内存 SQLite 与 GitHub API 仿真检查权限、CSRF、OAuth state/PKCE、草稿冲突、图片访问控制、发布原子性与仓库冲突处理，不会连接生产数据库或公开测试文字。
+
+上线还应核对 `/health`、实际 GitHub 登录、保存草稿和 GitHub Actions 的最终部署结果。`/health` 只返回是否配置完成，不返回密钥或账号资料。

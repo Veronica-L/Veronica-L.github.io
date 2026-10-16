@@ -2,6 +2,9 @@
 dist/
 preview-*.jpg
 node_modules/
+.wrangler/
+.dev.vars
+.dev.vars.*
 .tools/
 *.log
 

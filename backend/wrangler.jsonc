@@ -1,0 +1,27 @@
+{
+	"$schema": "./node_modules/wrangler/config-schema.json",
+	"name": "kiki-blog-admin",
+	"main": "worker.mjs",
+	"compatibility_date": "2026-10-16",
+	"workers_dev": true,
+	"assets": {
+		"directory": "./public",
+		"binding": "ASSETS",
+		"run_worker_first": true
+	},
+	"vars": {
+		"GITHUB_CLIENT_ID": "Ov23liOK88vSmxw4YLM4",
+		"SITE_URL": "https://veronica-l.github.io",
+		"GITHUB_OWNER": "Veronica-L",
+		"GITHUB_REPO": "Veronica-L.github.io",
+		"GITHUB_BRANCH": "main",
+		"OWNER_ID": "22854117"
+	},
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "kiki-blog-admin-db",
+			"database_id": "5c05ed8e-0712-4359-81d7-ddfdb924140f"
+		}
+	]
+}

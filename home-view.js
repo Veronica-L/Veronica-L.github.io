@@ -1,6 +1,7 @@
 'use strict';
 
 function postCover(post) {
+  if (post.media?.[0]?.src) return e(post.media[0].src);
   const covers = {
     'slow-days': 'reference-collage',
     'my-digital-garden': 'reference-abstract',
@@ -14,7 +15,7 @@ function postCover(post) {
 
 const artHome = {
   render() {
-    const lead = posts.find(post => post.id === 'slow-days');
+    const lead = sortNewest(posts.filter(post => post.published))[0] || posts.find(post => post.id === 'slow-days');
     const diary = sortNewest(diaries)[0];
     const recent = sortNewest(posts.filter(post => post.id !== lead.id)).slice(0, 2);
     return `<div class="page-enter art-home">
