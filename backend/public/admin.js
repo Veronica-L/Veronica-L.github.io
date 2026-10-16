@@ -7,7 +7,7 @@ async function api(path, method = 'GET', data, image = false) {
   const response = await fetch(path, { method, credentials: 'same-origin', headers: { 'X-Kiki-Request': '1', ...(data ? { 'Content-Type': image ? 'image/jpeg' : 'application/json' } : {}) }, ...(data ? { body: image ? data : JSON.stringify(data) } : {}) });
   const result = await response.json();
   if (!response.ok) {
-    if (response.status === 401) { $('login-panel').hidden = false; $('logout').hidden = true; $('login-status').textContent = '请登录后继续。编辑器中的文字仍保留在页面中，可先导出备份。'; }
+    if (response.status === 401) { $('login-panel').hidden = false; $('logout').hidden = true; $('show-analytics').hidden = true; $('analytics-panel').hidden = true; $('analytics-records').innerHTML = ''; $('login-status').textContent = '请登录后继续。编辑器中的文字仍保留在页面中，可先导出备份。'; }
     throw new Error(result.error || '操作未完成，请重试。');
   }
   return result;
@@ -187,6 +187,49 @@ window.addEventListener('beforeunload', event => { if (dirty) { event.preventDef
     const user = await api('/api/me');
     $('visit-site').href = user.siteUrl;
     const [current, trash] = await Promise.all([api('/api/entries'), api('/api/entries?trash=1')]); entries = [...current, ...trash];
-    $('login-panel').hidden = true; $('workspace').hidden = false; $('logout').hidden = false; openEntry();
+    $('login-panel').hidden = true; $('workspace').hidden = false; $('logout').hidden = false; $('show-analytics').hidden = false; openEntry();
   } catch (error) { $('login-status').textContent = error.message; }
 })();
+
+let analyticsCursor = null, analyticsLoading = false;
+const number = value => Number(value).toLocaleString('zh-CN');
+const visitTime = value => new Intl.DateTimeFormat('zh-CN', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).format(new Date(value));
+function visitRegion(row) {
+  let country = row.country;
+  try { country = new Intl.DisplayNames(['zh-CN'], { type: 'region' }).of(country) || country; } catch { /* Keep unknown codes readable. */ }
+  return [...new Set([country, row.region, row.city].filter(Boolean))].join(' / ') || '未知地区';
+}
+async function loadAnalytics(more = false) {
+  if (analyticsLoading) return;
+  analyticsLoading = true;
+  $('analytics-filters').querySelectorAll('button,input,select').forEach(node => node.disabled = true);
+  $('analytics-more').disabled = true;
+  $('analytics-status').textContent = '正在读取访问记录…';
+  if (!more) { $('analytics-records').innerHTML = ''; analyticsCursor = null; $('analytics-more').hidden = true; }
+  try {
+    const params = new URLSearchParams({ days: $('analytics-days').value, target: $('analytics-target').value, ip: $('analytics-ip').value.trim() });
+    if (more && analyticsCursor) params.set('before', analyticsCursor);
+    const data = await api('/api/analytics?' + params);
+    if ($('show-analytics').hidden) return;
+    $('analytics-total').textContent = number(data.summary.total);
+    $('analytics-today').textContent = number(data.summary.today);
+    $('analytics-ips').textContent = number(data.summary.ips);
+    const target = $('analytics-target').value;
+    $('analytics-target').innerHTML = '<option value="">全部页面</option>' + data.pages.map(page => `<option value="${escape(page.target)}">${escape(page.title)}</option>`).join('');
+    $('analytics-target').value = target;
+    $('analytics-pages').innerHTML = data.pages.length ? data.pages.map(page => `<div><span>${escape(page.title)}<small>${page.target.startsWith('article:') ? '文章' : '页面'}</small></span><strong>${number(page.views)}</strong></div>`).join('') : '<p class="muted">暂无访问记录。</p>';
+    $('analytics-records').insertAdjacentHTML('beforeend', data.records.map(row => `<tr><td>${escape(visitTime(row.visitedAt))}</td><td>${escape(row.title)}<small>${row.target.startsWith('article:') ? '文章' : '页面'}</small></td><td class="visit-ip">${escape(row.ip)}</td><td>${escape(visitRegion(row))}</td></tr>`).join(''));
+    analyticsCursor = data.next; $('analytics-more').hidden = !analyticsCursor;
+    const size = $('analytics-records').children.length;
+    $('analytics-status').textContent = size ? `已显示 ${size} 条访问记录${analyticsCursor ? '，可继续加载。' : '。'}` : '此筛选条件下暂无访问记录。';
+  } catch (error) { $('analytics-status').textContent = '读取失败：' + error.message; }
+  finally {
+    analyticsLoading = false; $('analytics-more').disabled = false;
+    $('analytics-filters').querySelectorAll('button,input,select').forEach(node => node.disabled = false);
+  }
+}
+$('show-analytics').onclick = () => { $('workspace').hidden = true; $('analytics-panel').hidden = false; loadAnalytics(); };
+$('back-to-editor').onclick = () => { $('analytics-panel').hidden = true; $('workspace').hidden = false; };
+$('analytics-filters').onsubmit = event => { event.preventDefault(); loadAnalytics(); };
+$('analytics-more').onclick = () => loadAnalytics(true);
+$('analytics-filters').oninput = () => { analyticsCursor = null; $('analytics-more').hidden = true; };

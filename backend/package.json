@@ -6,7 +6,7 @@
     "dev": "node ../scripts/sync-markdown.cjs && wrangler dev --port 8793",
     "deploy": "node ../scripts/sync-markdown.cjs && wrangler deploy",
     "test": "node --test test/*.test.mjs",
-    "check": "node --check worker.mjs && node --check public/admin.js"
+    "check": "node --check worker.mjs && node --check analytics.mjs && node --check public/admin.js"
   },
   "devDependencies": { "wrangler": "^4.0.0" }
 }

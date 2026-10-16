@@ -6,7 +6,7 @@ const assert = require('node:assert/strict');
 
 const root = path.resolve(__dirname, '..');
 const output = path.join(root, 'dist');
-const siteFiles = ['index.html', 'art-style.css', 'app.js', 'home-view.js', 'diary-media.js', 'diary-ui.js', 'site-config.js', 'content-client.js', 'content/feed.json', 'admin/index.html', 'admin/admin-gateway.css', 'admin/admin-gateway.js', 'markdown-renderer.js', 'markdown.css', 'mermaid-client.js', 'diagram.html', 'diagram.css', 'diagram-frame.mjs'];
+const siteFiles = ['index.html', 'art-style.css', 'app.js', 'home-view.js', 'diary-media.js', 'diary-ui.js', 'site-config.js', 'analytics-client.js', 'content-client.js', 'content/feed.json', 'admin/index.html', 'admin/admin-gateway.css', 'admin/admin-gateway.js', 'markdown-renderer.js', 'markdown.css', 'mermaid-client.js', 'diagram.html', 'diagram.css', 'diagram-frame.mjs'];
 const vendorFiles = ['vendor/marked.umd.js', 'vendor/purify.min.js', 'vendor/MARKED-LICENSE.txt', 'vendor/DOMPURIFY-LICENSE.txt'];
 for (const entry of fs.readdirSync(path.join(root, 'vendor/mermaid'), { recursive: true, withFileTypes: true })) {
   assert(!entry.isSymbolicLink(), 'Mermaid modules cannot contain links');

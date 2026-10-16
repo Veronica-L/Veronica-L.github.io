@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>管理后台 · Kiki's Blog</title><link rel="stylesheet" href="/admin.css"><link rel="stylesheet" href="/markdown.css"><script src="/vendor/marked.umd.js" defer></script><script src="/vendor/purify.min.js" defer></script><script src="/markdown-renderer.js" defer></script><script src="/mermaid-client.js" defer></script><script src="/admin.js" defer></script></head>
 <body>
-  <header class="topbar"><a class="logo" href="/admin">Kiki's Blog<span>管理后台</span></a><nav><a id="visit-site" href="https://veronica-l.github.io/" target="_blank" rel="noopener">查看网站 ↗</a><button id="logout" hidden>退出登录</button></nav></header>
+  <header class="topbar"><a class="logo" href="/admin">Kiki's Blog<span>管理后台</span></a><nav><button id="show-analytics" hidden>访问统计</button><a id="visit-site" href="https://veronica-l.github.io/" target="_blank" rel="noopener">查看网站 ↗</a><button id="logout" hidden>退出登录</button></nav></header>
   <main>
     <section id="login-panel" class="login-panel"><span class="eyebrow">KIKI / ADMIN</span><h1>登录管理后台<span>.</span></h1><p>管理文章、日记和插图。</p><p class="muted">仅博客所有者可以登录。草稿只保存在后台，不会出现在公开网站。</p><a class="primary" id="login-link" href="/auth/login">使用 GitHub 登录 ↗</a><p id="login-status" role="status">正在检查登录状态…</p></section>
     <div id="workspace" class="workspace" hidden>
@@ -18,6 +18,17 @@
         <section class="publication"><div><strong>发布状态</strong><p id="publish-status" role="status">尚未发布。保存草稿不会公开内容。</p></div><button id="unpublish" hidden>撤下公开版本</button></section><p class="footnote">发布内容会进入公开 GitHub 仓库。撤下内容不会清除仓库历史和已公开的图片。</p>
       </section>
     </div>
+    <section id="analytics-panel" class="analytics-panel" hidden aria-labelledby="analytics-heading">
+      <div class="editor-heading"><div><span class="eyebrow">ANALYTICS / 访问</span><h1 id="analytics-heading">访问统计</h1></div><button id="back-to-editor">返回写作</button></div>
+      <div class="analytics-summary"><div><span>累计浏览</span><strong id="analytics-total">—</strong></div><div><span>今日浏览</span><strong id="analytics-today">—</strong></div><div><span>近 30 天访问 IP</span><strong id="analytics-ips">—</strong></div></div>
+      <p class="muted">统计页面访问与文章打开次数。同一 IP 在 30 分钟内重复访问同一页面计一次，IP 数不等于人数。今日按北京时间计算；列表时间也为北京时间。</p>
+      <div class="analytics-layout"><section><h2>页面浏览量</h2><div id="analytics-pages" class="analytics-pages"></div></section><section class="analytics-record-section"><h2>访问记录</h2>
+        <form id="analytics-filters" class="analytics-filters"><label>时间<select id="analytics-days"><option value="30">近 30 天</option><option value="7">近 7 天</option><option value="1">近 24 小时</option></select></label><label>页面<select id="analytics-target"><option value="">全部页面</option></select></label><label>IP<input id="analytics-ip" placeholder="输入完整 IP" maxlength="45" autocomplete="off"></label><button type="submit">查询 / 刷新</button></form>
+        <p id="analytics-status" role="status" class="muted"></p>
+        <div class="analytics-table-wrap" tabindex="0" role="region" aria-label="访问记录，可横向滚动"><table class="analytics-table"><thead><tr><th>访问时间</th><th>页面 / 文章</th><th>IP</th><th>大致地区</th></tr></thead><tbody id="analytics-records"></tbody></table></div><button id="analytics-more" hidden>加载更早记录</button>
+      </section></div>
+      <p class="footnote">详细记录只对登录后的管理员可见，保存在 Cloudflare D1，保留约 30 天并每小时清理；累计浏览量继续保留。地区来自 IP 的大致定位，可能显示代理出口所在地或未知地区。统计从功能上线后开始，禁用脚本或拦截统计请求的访问无法记录。</p>
+    </section>
     <div id="notice" role="alert" hidden></div>
   </main>
 </body></html>

@@ -1,3 +1,4 @@
+import { AnalyticsError, analyticsCors, publicAnalytics, analyticsReport, cleanVisits } from './analytics.mjs';
 const encoder = new TextEncoder();
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const SESSION = '__Host-kiki-session';
@@ -61,8 +62,8 @@ async function body(request, limit = 150000) {
   for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
   return bytes;
 }
-async function jsonBody(request) {
-  try { return JSON.parse(new TextDecoder().decode(await body(request))); }
+async function jsonBody(request, limit) {
+  try { return JSON.parse(new TextDecoder().decode(await body(request, limit))); }
   catch (error) { if (error instanceof HttpError) throw error; fail(400, '请求格式不正确。'); }
 }
 function sameOrigin(request) {
@@ -243,11 +244,13 @@ async function handle(request, env) {
   if (path === '/health' && request.method === 'GET') return json({ ok: true, configured: Boolean(env.DB && env.SESSION_SECRET && env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET) });
   if (path === '/auth/login' && request.method === 'GET') return login(request, env);
   if (path === '/auth/callback' && request.method === 'GET') return callback(request, env);
+  if (path.startsWith('/public/analytics/')) return publicAnalytics(request, env, request => jsonBody(request, 2048));
   if (path.startsWith('/api/')) {
     if (!env.DB) fail(503, '后台数据库尚未配置。');
     const auth = await session(request, env);
     if (!['GET', 'HEAD'].includes(request.method)) sameOrigin(request);
     if (path === '/api/me' && request.method === 'GET') return json({ login: env.GITHUB_OWNER, siteUrl: env.SITE_URL });
+    if (path === '/api/analytics' && request.method === 'GET') return analyticsReport(url, env);
     if (path === '/api/logout' && request.method === 'POST') {
       await env.DB.prepare('DELETE FROM sessions WHERE id = ?').bind(auth.id).run();
       return new Response('{}', { headers: { 'Content-Type': 'application/json', 'Set-Cookie': cookie(SESSION, '', 0) } });
@@ -297,7 +300,11 @@ async function handle(request, env) {
 }
 export default {
   async fetch(request, env) {
-    try { return protect(await handle(request, env), ['/diagram', '/diagram.html'].includes(new URL(request.url).pathname)); }
-    catch (error) { return protect(json({ error: error instanceof HttpError ? error.message : '服务暂时无法完成操作，请稍后重试。' }, error instanceof HttpError ? error.status : 500)); }
+    let response;
+    const path = new URL(request.url).pathname;
+    try { response = protect(await handle(request, env), ['/diagram', '/diagram.html'].includes(path)); }
+    catch (error) { const known = error instanceof HttpError || error instanceof AnalyticsError; response = protect(json({ error: known ? error.message : '服务暂时无法完成操作，请稍后重试。' }, known ? error.status : 500)); }
+    return path.startsWith('/public/analytics/') ? analyticsCors(request, env, response) : response;
   },
+  async scheduled(event, env, ctx) { ctx.waitUntil(cleanVisits(env)); },
 };
