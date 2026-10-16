@@ -284,7 +284,7 @@ async function handle(request, env) {
   if (request.method !== 'GET' && request.method !== 'HEAD') fail(405, '不支持此操作。');
   if (path === '/') return Response.redirect(new URL('/admin', request.url), 302);
   if (path === '/admin' || path === '/admin/') return env.ASSETS.fetch(new Request(new URL('/', request.url), request));
-  if (['/admin.js', '/admin.css'].includes(path)) return env.ASSETS.fetch(request);
+  if (['/admin.js', '/admin.css', '/markdown-renderer.js', '/markdown.css', '/vendor/marked.umd.js', '/vendor/purify.min.js'].includes(path)) return env.ASSETS.fetch(request);
   fail(404, '页面不存在。');
 }
 export default {

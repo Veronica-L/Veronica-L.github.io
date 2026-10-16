@@ -9,6 +9,7 @@
 1. 使用博客所有者的 GitHub 账号登录；其他账号无法读取或修改后台内容。
 2. 新建文章或日记，填写标题、日期、正文、分类和标签。
 3. 插图上传后仍为后台私有资源。保存草稿会把文字存入 Cloudflare D1，换设备登录后可以继续编辑。
+   编辑与公开正文使用同一套 Markdown 渲染，支持 GFM 表格、粗体、行内代码、代码块、列表、引用和链接；宽表格可横向滚动。正文中的原始 HTML 作为文本展示。
 4. 点击「发布到网站」，将当前记录与引用的图片一起提交至 GitHub。页面会区分正在部署、部署成功和部署失败。
 5. 日记中的图片会自动出现在公开照片墙的「日记」相册；文章插图显示在正文中。
 6. 已有公开版本的内容可继续修改并保存草稿，直到再次发布，访客看到的仍为上一个公开版本。
@@ -47,6 +48,7 @@ https://kiki-blog-admin.kiki-blog-admin.workers.dev/auth/callback
 
 ```text
 npm ci --prefix backend
+npm ci --ignore-scripts
 npm run check
 npm test
 npm run build
@@ -58,5 +60,7 @@ npm --prefix backend run deploy
 ## 验证
 
 `npm test` 使用真实内存 SQLite 与 GitHub API 仿真检查权限、CSRF、OAuth state/PKCE、草稿冲突、图片访问控制、发布原子性与仓库冲突处理，不会连接生产数据库或公开测试文字。
+
+Markdown 测试使用 jsdom 运行实际预览按钮、文章与日记渲染代码，并检查表格、图片和 HTML 安全过滤。Marked 与 DOMPurify 的浏览器文件及许可证存于 `vendor/`，随站点本地部署；后台部署脚本复制同一份渲染代码与样式，避免前后台显示不一致。
 
 上线还应核对 `/health`、实际 GitHub 登录、保存草稿和 GitHub Actions 的最终部署结果。`/health` 只返回是否配置完成，不返回密钥或账号资料。

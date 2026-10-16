@@ -5,6 +5,9 @@ node_modules/
 .wrangler/
 .dev.vars
 .dev.vars.*
+backend/public/vendor/
+backend/public/markdown-renderer.js
+backend/public/markdown.css
 .tools/
 *.log
 

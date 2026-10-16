@@ -53,15 +53,7 @@ function renderImages() {
   $('image-list').innerHTML = refs.map((ref, index) => `<figure class="image-item"><img src="/api/media/${ref.id}" alt="插图 ${index + 1}"><button type="button" data-remove="${ref.id}" aria-label="移除插图 ${index + 1}">×</button><figcaption>插图 ${index + 1}</figcaption></figure>`).join('');
 }
 function prose(text) {
-  const pattern = /!\[([^\]\n]*)\]\(diary-image:([a-z0-9-]+)\)/g;
-  const renderText = raw => raw.split(/\n\s*\n/).filter(Boolean).map(block => {
-    const safe = escape(block);
-    if (/^#{1,3} /.test(block)) { const level = block.match(/^#+/)[0].length; return `<h${level}>${safe.replace(/^#+ /, '')}</h${level}>`; }
-    return `<p>${safe}</p>`;
-  }).join('');
-  let html = '', end = 0;
-  for (const match of text.matchAll(pattern)) { html += renderText(text.slice(end, match.index)); html += `<figure><img src="/api/media/${match[2]}" alt="${escape(match[1])}"><figcaption>${escape(match[1])}</figcaption></figure>`; end = match.index + match[0].length; }
-  return html + renderText(text.slice(end));
+  return window.kikiMarkdown.render(text, { title: $('title').value, resolveImage: id => ({ src: '/api/media/' + id }) });
 }
 function selectTab(preview) {
   $('body').hidden = preview; $('preview').hidden = !preview;

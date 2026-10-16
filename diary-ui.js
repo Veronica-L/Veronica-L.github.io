@@ -25,13 +25,10 @@ const diaryUI = {
   },
 
   body(diary) {
-    let body = diaryMedia.parts(diary.body).map(part => {
-      if (part.text !== undefined) return part.text.trim() ? `<p>${e(part.text.trim())}</p>` : '';
-      const asset = diaryMedia.assets.get(part.id);
-      if (!asset) return '<div class="missing-image">这张图片暂时无法读取，请在保存它的浏览器里查看。</div>';
-      const index = photos.findIndex(photo => photo.assetId === part.id && photo.diaryId === diary.id);
-      return `<button class="diary-inline-photo" data-photo="${index}" aria-label="放大 ${e(part.caption || asset.name)}"><img src="${e(asset.src)}" alt="${e(part.caption || asset.name)}" loading="lazy"></button><div class="diary-inline-caption">${e(part.caption || asset.name)}</div>`;
-    }).join('');
+    let body = `<div class="markdown-content">${window.kikiMarkdown.render(diary.body, { title: diary.title, resolveImage: id => {
+      const asset = diaryMedia.assets.get(id);
+      return asset ? { ...asset, photoIndex: photos.findIndex(photo => photo.assetId === id && photo.diaryId === diary.id) } : null;
+    } })}</div>`;
     if (diary.image) {
       const index = photos.findIndex(photo => photo.diaryId === diary.id && photo.image === diary.image);
       body += `<button class="diary-inline-photo" data-photo="${index}" aria-label="放大日记配图"><img src="assets/${e(diary.image)}.jpg" alt="${e(diary.title)}的配图" loading="lazy"></button>`;

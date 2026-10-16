@@ -26,6 +26,8 @@ jobs:
         with:
           node-version: '24'
           package-manager-cache: false
+      - name: Install verification dependencies
+        run: npm ci --ignore-scripts --no-fund --no-audit
       - name: Check JavaScript
         run: npm run check
       - name: Verify authentication and publishing
