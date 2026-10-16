@@ -55,6 +55,9 @@ test('renderer-only frame policy keeps the admin API private and supports sandbo
   assert.equal(frame.headers.get('Access-Control-Allow-Origin'), '*');
   assert.match(frame.headers.get('Content-Security-Policy'), /frame-ancestors 'self'/);
   assert.match(frame.headers.get('Content-Security-Policy'), /connect-src 'none'/);
+  const canonicalFrame = await worker.fetch(new Request('https://example.test/diagram'), env);
+  assert.equal(canonicalFrame.status, 200); assert.equal(canonicalFrame.headers.get('X-Frame-Options'), 'SAMEORIGIN');
+  assert.match(canonicalFrame.headers.get('Content-Security-Policy'), /frame-ancestors 'self'/);
   const module = await worker.fetch(new Request('https://example.test/vendor/mermaid/mermaid.esm.min.mjs'), env);
   assert.equal(module.status, 200); assert.equal(module.headers.get('Access-Control-Allow-Origin'), '*');
   const privateResponse = await worker.fetch(new Request('https://example.test/api/entries'), env);
