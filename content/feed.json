@@ -1,5 +1,25 @@
 {
   "version": 1,
-  "posts": [],
-  "diaries": []
+  "posts": [
+    {
+      "type": "blog",
+      "title": "ARTEX底座",
+      "body": "2026.10.15\n\n**Test：**\nvulfocus 靶场： https://hub.docker.com/u/vulfocus?page=2\nelasticsearch-cve_2015_1427 ✅️\ntomcat-cve_2020_1938 \n\nEarth靶场：https://www.vulnhub.com/entry/the-planets-earth,755/\n能找到两个漏洞\n\n2026.10.16\n发现browser mcp不可用，因为docker里没有chrome\n安装后写了个冒烟测试脚本测试chrome是否可用\nARTEX 的 MCP 接入方式清楚了：`mcp_servers` 表（支持 http/sse/stdio 三种传输，`env` 字段在 http 模式下兼作请求头）+ `agent_visibility` 绑定。可以脚本化配置。",
+      "date": "2026-10-16",
+      "category": "技术手记",
+      "tags": [
+        "Agent"
+      ],
+      "images": [],
+      "id": "b8e92285-aa5a-4b34-b73a-f5a005dd4d59",
+      "published": true,
+      "media": [],
+      "image": "reference-flowers",
+      "excerpt": "2026.10.15\n\n**Test：**\nvulfocus 靶场： https://hub.docker.com/u/vulfocus?page=2\nelasticsearch-cve_2",
+      "mood": "日记",
+      "publishedAt": "2026-10-16T03:20:03.373Z"
+    }
+  ],
+  "diaries": [],
+  "updatedAt": "2026-10-16T03:20:03.373Z"
 }
