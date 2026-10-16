@@ -1,0 +1,12 @@
+{
+  "name": "kiki-blog-prototype",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Kiki's Blog：复古纸张与摄影拼贴风格的个人博客原型",
+  "scripts": {
+    "dev": "node server.cjs",
+    "start": "node server.cjs",
+    "check": "node --check app.js && node --check home-view.js && node --check diary-media.js && node --check diary-ui.js && node --check server.cjs && node --check scripts/build-pages.cjs",
+    "build": "node scripts/build-pages.cjs"
+  }
+}

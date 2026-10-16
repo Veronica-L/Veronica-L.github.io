@@ -1,0 +1,27 @@
+# Generated files and local previews
+dist/
+preview-*.jpg
+node_modules/
+.tools/
+*.log
+
+# Credentials and local data
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.db
+*.sqlite*
+backups/
+private/
+.codex/
+.agents/
+.aws/
+
+# Local editor / operating system state
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

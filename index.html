@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ece8dd">
+  <meta name="description" content="Kiki's Blog · 文章、日记、照片与音乐。">
+  <title>Kiki's Blog</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2080%2080%22%3E%3Crect%20width%3D%2280%22%20height%3D%2280%22%20fill%3D%22%23eee9db%22%2F%3E%3Cpath%20fill%3D%22%23304e8d%22%20d%3D%22M12%2012h28v56H12zM44%2040h24v28H44z%22%2F%3E%3Ccircle%20cx%3D%2256%22%20cy%3D%2224%22%20r%3D%2212%22%20fill%3D%22%23bf5239%22%2F%3E%3C%2Fsvg%3E">
+  <link rel="stylesheet" href="art-style.css">
+  <script src="diary-media.js" defer></script>
+  <script src="diary-ui.js" defer></script>
+  <script src="home-view.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">跳到内容</a>
+  <div class="landscape" aria-hidden="true"></div>
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="#home" class="brand" aria-label="Kiki's Blog 首页"><span class="brand-mark" data-icon="archive"></span><span>Kiki's Blog</span><span class="brand-sub">A PERSONAL JOURNAL</span></a>
+      <nav class="main-nav" aria-label="主导航">
+        <a href="#home" data-page="home">首页</a>
+        <a href="#blog" data-page="blog">文章</a>
+        <a href="#diary" data-page="diary">日记</a>
+        <a href="#photos" data-page="photos">照片墙</a>
+        <a href="#music" data-page="music">云音乐</a>
+        <a href="#explore" data-page="explore">分类归档</a>
+      </nav>
+      <div class="header-tools"><button class="icon-button" id="search-open" aria-label="搜索文章" title="搜索 /" data-icon="search"></button><button class="icon-button" id="theme-toggle" aria-label="切换深色主题" title="切换明暗主题" data-icon="moon"></button><button class="write-button" id="write-open"><span data-icon="pen"></span><span>新建内容</span></button></div>
+    </div>
+  </header>
+  <main id="main" tabindex="-1"></main>
+  <footer class="site-footer"><a class="footer-brand" href="#home">Kiki's Blog<span> · </span>个人博客</a><span>© 2026 Kiki's Blog</span><span class="prototype-label"><i></i>交互原型 · 示例内容</span></footer>
+  <section class="mini-player glass" aria-label="音乐播放器">
+    <button class="record-button" id="player-cover" aria-label="打开云音乐"><span class="vinyl"><i></i></span></button>
+    <div class="player-copy"><strong id="player-title">林间来信</strong><span id="player-subtitle">原创氛围音 · 点击试听</span></div>
+    <div class="player-controls"><button class="icon-button" id="prev-track" aria-label="上一首" data-icon="prev"></button><button class="play-button" id="play-toggle" aria-label="播放" data-icon="play"></button><button class="icon-button" id="next-track" aria-label="下一首" data-icon="next"></button></div>
+    <div class="player-progress"><input type="range" id="seek" min="0" max="100" value="0" step="0.1" aria-label="播放进度"><span id="player-time">00:00 / 00:32</span></div>
+    <button class="icon-button player-volume" id="mute-toggle" aria-label="静音" data-icon="volume"></button><button class="icon-button" id="playlist-open" aria-label="打开歌单" data-icon="list"></button>
+  </section>
+  <audio id="audio" preload="metadata" src="assets/forest-letter.wav"></audio>
+  <dialog id="search-dialog" class="glass modal search-modal"><form method="dialog" class="modal-heading"><span>搜索内容</span><button class="icon-button" aria-label="关闭搜索" data-icon="close"></button></form><div class="search-input-wrap"><span data-icon="search"></span><input id="search-input" type="search" placeholder="搜索文章、标签、日记…" autocomplete="off"></div><div id="search-results"></div><div class="search-hint">按 Esc 关闭 · 支持标题与正文搜索</div></dialog>
+  <dialog id="article-dialog" class="glass modal article-modal"><button class="icon-button modal-close" id="article-close" aria-label="关闭文章" data-icon="close"></button><div id="article-content"></div></dialog>
+  <dialog id="photo-dialog" class="lightbox"><button class="icon-button lightbox-close" id="photo-close" aria-label="关闭照片" data-icon="close"></button><button class="icon-button lightbox-prev" id="photo-prev" aria-label="上一张照片" data-icon="arrowLeft"></button><figure><img id="lightbox-img" alt=""><figcaption id="lightbox-caption"></figcaption><a id="lightbox-source" class="lightbox-source" hidden>查看这篇日记 ↗</a></figure><button class="icon-button lightbox-next" id="photo-next" aria-label="下一张照片" data-icon="arrowRight"></button></dialog>
+  <dialog id="editor-dialog" class="glass modal editor-modal"><form method="dialog" class="modal-heading"><span><span data-icon="pen"></span> 新建内容</span><button class="icon-button" aria-label="关闭编辑器" data-icon="close"></button></form><form id="editor-form"><div class="editor-meta"><label>记录类型<select id="entry-type"><option value="blog">博客文章</option><option value="diary">日记</option></select></label><label id="category-field">分类<select id="entry-category"><option>生活随笔</option><option>技术手记</option><option>旅行见闻</option></select></label><label>日期<input type="date" id="entry-date" required></label></div><label class="sr-only" for="entry-title">标题</label><input class="editor-title" id="entry-title" placeholder="标题" maxlength="100" required><label class="sr-only" for="entry-body">正文</label><textarea id="entry-body" placeholder="输入正文。支持 Markdown 标题和列表。" required></textarea><section id="diary-image-tools" class="diary-image-tools" hidden><div class="diary-image-toolbar"><button type="button" class="secondary-button" id="insert-diary-image"><span data-icon="camera"></span> 插入图片</button><button type="button" class="image-example-button" id="example-diary-images">试用示例图</button><span id="image-upload-status">保存后自动收进照片墙的「日记」目录</span></div><input type="file" id="diary-image-input" accept="image/jpeg,image/png,image/webp,image/gif,image/avif" multiple hidden><div id="diary-image-previews" class="diary-image-previews"></div></section><div class="editor-tags"><span data-icon="tag"></span><label class="sr-only" for="entry-tags">标签</label><input id="entry-tags" placeholder="添加标签，用逗号分隔，如：日常, 灵感"></div><div class="editor-bottom"><span id="draft-status">内容仅保存在当前浏览器</span><div><button type="button" class="secondary-button" id="save-draft">存为草稿</button><button class="primary-button" type="submit">保存记录 <span data-icon="arrowUpRight"></span></button></div></div></form></dialog>
+  <div class="toast" id="toast" role="status"></div>
+</body>
+</html>
