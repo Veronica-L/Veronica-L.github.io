@@ -11,8 +11,14 @@ const fail = (status, message) => { throw new HttpError(status, message); };
 const json = (data, status = 200) => Response.json(data, { status });
 const cookie = (name, value, age) => `${name}=${value}; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=${age}`;
 const cookies = request => Object.fromEntries((request.headers.get('Cookie') || '').split(';').map(v => v.trim().split('=')));
-function b64(bytes) { let s = ''; for (const byte of new Uint8Array(bytes)) s += String.fromCharCode(byte); return btoa(s); }
-function unb64(value) { return Uint8Array.from(atob(value), c => c.charCodeAt(0)); }
+function b64(bytes) {
+  const data = new Uint8Array(bytes);
+  if (typeof data.toBase64 === 'function') return data.toBase64();
+  const chunks = [];
+  for (let offset = 0; offset < data.length; offset += 32768) chunks.push(String.fromCharCode(...data.subarray(offset, offset + 32768)));
+  return btoa(chunks.join(''));
+}
+function unb64(value) { return typeof Uint8Array.fromBase64 === 'function' ? Uint8Array.fromBase64(value) : Uint8Array.from(atob(value), c => c.charCodeAt(0)); }
 const base64url = bytes => b64(bytes).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
 const random = () => base64url(crypto.getRandomValues(new Uint8Array(32)));
 const digest = async text => base64url(await crypto.subtle.digest('SHA-256', encoder.encode(text)));
@@ -173,7 +179,8 @@ export async function publish(env, token, id, revision, unpublish = false) {
     // Read the exact parent commit. A branch update during publication must fail,
     // rather than overwrite a newer feed or unrelated source changes.
     const existing = await github(env, token, `${repo}/contents/${FEED}?ref=${ref.object.sha}`);
-    const feed = decodeContent(existing);
+    const content = existing.encoding === 'none' ? await github(env, token, `${repo}/git/blobs/${existing.sha}`) : existing;
+    const feed = decodeContent(content);
     if (feed.version !== 1 || !Array.isArray(feed.posts) || !Array.isArray(feed.diaries)) fail(502, '网站内容索引格式有误，未修改仓库。');
     feed.posts = feed.posts.filter(item => item.id !== id);
     feed.diaries = feed.diaries.filter(item => item.id !== id);

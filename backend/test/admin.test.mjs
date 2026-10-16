@@ -158,3 +158,18 @@ test('a concurrent publication cannot acquire the same repository lock', async (
   env.GITHUB_FETCH = () => { throw new Error('GitHub must not be called'); };
   assert.equal((await worker.fetch(req('/api/publish/' + id, { method: 'POST', raw, data: { revision: 1 } }), env)).status, 409);
 });
+test('unpublishing removes only the selected public record while retaining the editable draft', async () => {
+  const { env, raw } = await fixture(); await insert(env); const calls = githubMock(env);
+  const response = await worker.fetch(req('/api/unpublish/' + id, { method: 'POST', raw, data: { revision: 1 } }), env);
+  assert.equal(response.status, 200);
+  const tree = calls.find(call => call.path.endsWith('/git/trees')).body.tree;
+  assert.deepEqual(tree.map(item => item.path), ['content/feed.json']);
+  const feed = JSON.parse(tree[0].content); assert.equal(feed.posts.length, 1); assert.equal(feed.diaries.length, 0);
+  const draft = await env.DB.prepare('SELECT * FROM entries WHERE id = ?').bind(id).first();
+  assert.equal(draft.published_revision, null); assert.equal(JSON.parse(draft.document).title, doc.title);
+});
+test('stale publication requests never contact GitHub', async () => {
+  const { env, raw } = await fixture(); await insert(env);
+  env.GITHUB_FETCH = () => { throw new Error('Stale version must not publish'); };
+  assert.equal((await worker.fetch(req('/api/publish/' + id, { method: 'POST', raw, data: { revision: 0 } }), env)).status, 409);
+});
