@@ -13,11 +13,21 @@ async function api(path, method = 'GET', data, image = false) {
   return result;
 }
 function formData() { return { type: $('type').value, title: $('title').value, body: $('body').value, date: $('date').value, category: $('category').value, tags: $('tags').value.split(/[,，、]/).map(s => s.trim()).filter(Boolean), ...(active ? { revision: active.revision } : {}) }; }
-function stateLabel(entry) { return entry.publishedRevision == null ? '未发布草稿' : entry.publishedRevision === entry.revision ? '已提交发布' : '有未发布修改'; }
+function stateLabel(entry) { return entry.deletedAt ? '已在回收站' : entry.publishedRevision == null ? '未发布草稿' : entry.publishedRevision === entry.revision ? '已提交发布' : '有未发布修改'; }
 function renderList() {
   const filter = $('entry-filter').value;
-  const list = entries.filter(entry => filter === 'all' || entry.type === filter || (filter === 'draft' && entry.publishedRevision == null));
-  $('entry-list').innerHTML = list.length ? list.map(entry => `<button class="entry-item ${entry.id === active?.id ? 'active' : ''}" data-id="${entry.id}"><strong>${escape(entry.title)}</strong><small>${entry.type === 'diary' ? '日记' : '文章'} · ${escape(entry.date)} · ${stateLabel(entry)}</small></button>`).join('') : '<p class="muted">暂无内容。新建一篇开始写作。</p>';
+  const list = entries.filter(entry => filter === 'trash' ? Boolean(entry.deletedAt) : !entry.deletedAt && (filter === 'all' || entry.type === filter || (filter === 'draft' && entry.publishedRevision == null)));
+  $('entry-list').innerHTML = list.length ? list.map(entry => `<button class="entry-item ${entry.id === active?.id ? 'active' : ''}" data-id="${entry.id}"><strong>${escape(entry.title)}</strong><small>${entry.type === 'diary' ? '日记' : '文章'} · ${escape(entry.date)} · ${stateLabel(entry)}</small></button>`).join('') : `<p class="muted">${filter === 'trash' ? '回收站为空。' : '暂无内容。新建一篇开始写作。'}</p>`;
+}
+function setEditorMode() {
+  const trashed = Boolean(active?.deletedAt);
+  for (const id of ['type', 'date', 'title', 'body', 'category', 'tags', 'insert-image']) $(id).disabled = trashed;
+  $('image-list').querySelectorAll('button').forEach(button => button.disabled = trashed);
+  $('save-draft').hidden = $('publish').hidden = trashed;
+  $('delete-entry').hidden = !active || trashed;
+  $('delete-entry').textContent = active?.type === 'diary' ? '删除日记' : '删除文章';
+  $('restore-entry').hidden = !trashed;
+  $('unpublish').hidden = trashed || active?.publishedRevision == null;
 }
 function markDirty() { dirty = true; $('save-state').textContent = '有未保存的修改'; $('record-state').textContent = '未保存修改'; renderImages(); }
 function canLeave() { return !dirty || confirm('当前修改尚未保存，确定离开吗？可以先保存草稿。'); }
@@ -31,10 +41,10 @@ function openEntry(entry = null) {
   $('category-label').hidden = $('type').value === 'diary';
   $('editor-heading').textContent = entry ? '编辑内容' : '新建内容';
   $('record-state').textContent = entry ? stateLabel(entry) : '未保存';
-  $('save-state').textContent = entry ? '草稿已保存在后台' : '内容尚未保存。';
+  $('save-state').textContent = entry?.deletedAt ? '内容保留在回收站，可恢复为草稿。' : entry ? '草稿已保存在后台' : '内容尚未保存。';
   $('unpublish').hidden = entry?.publishedRevision == null;
-  $('publish-status').textContent = entry?.publishedRevision != null ? '已提交过公开版本；草稿修改需要再次发布才会公开。' : '尚未发布。保存草稿不会公开内容。';
-  renderImages(); renderList(); selectTab(false);
+  $('publish-status').textContent = entry?.deletedAt ? '已移入回收站。公开版本的移除需等待网站部署完成；恢复后不会自动重新发布。' : entry?.publishedRevision != null ? '已提交过公开版本；草稿修改需要再次发布才会公开。' : '尚未发布。保存草稿不会公开内容。';
+  renderImages(); renderList(); selectTab(false); setEditorMode();
   if (entry?.commitSha) watchDeployment(entry.commitSha);
 }
 const imageRefs = text => [...text.matchAll(/!\[([^\]\n]*)\]\(diary-image:([a-z0-9-]+)\)/g)].map(m => ({ id: m[2], caption: m[1] }));
@@ -65,10 +75,10 @@ async function withBusy(action) {
   controls.forEach(button => button.disabled = true);
   try { await action(); } catch (error) {
     notice(error.message);
-    $('save-state').textContent = dirty ? '修改尚未保存，请重试或导出备份。' : active ? '草稿已保存在后台' : '内容尚未保存。';
-    if (/正在提交|正在撤下/.test($('publish-status').textContent)) $('publish-status').textContent = '操作未完成：' + error.message;
+    $('save-state').textContent = dirty ? '修改尚未保存，请重试或导出备份。' : active?.deletedAt ? '内容保留在回收站，可恢复为草稿。' : active ? '草稿已保存在后台' : '内容尚未保存。';
+    if (/正在提交|正在撤下|正在删除/.test($('publish-status').textContent)) $('publish-status').textContent = '操作未完成：' + error.message;
   }
-  finally { busy = false; controls.forEach(button => button.disabled = false); }
+  finally { busy = false; controls.forEach(button => button.disabled = false); setEditorMode(); }
 }
 async function save() {
   if (!$('content-form').reportValidity()) return null;
@@ -122,6 +132,31 @@ $('unpublish').onclick = () => {
     active.publishedRevision = null; active.commitSha = result.sha; $('unpublish').hidden = true; $('record-state').textContent = stateLabel(active); renderList(); watchDeployment(result.sha);
   });
 };
+$('delete-entry').onclick = () => {
+  if (!active || active.deletedAt) return;
+  const title = active.title, kind = active.type === 'diary' ? '日记' : '文章';
+  const detail = active.publishedRevision != null ? '公开版本也会从网站移除，需等待部署完成。' : '';
+  if (!confirm(`删除${kind}「${title}」并移入回收站？${detail}${dirty ? '当前未保存的修改不会保留。' : ''}之后可以从回收站恢复，已公开的图片与仓库历史不会被清除。`)) return;
+  withBusy(async () => {
+    clearStatus(); $('publish-status').textContent = '正在删除并处理公开版本…';
+    const result = await api(`/api/entries/${active.id}`, 'DELETE', { revision: active.revision });
+    entries = [result.entry, ...entries.filter(entry => entry.id !== result.entry.id)];
+    dirty = false; openEntry();
+    $('publish-status').textContent = result.deployment ? '已移入回收站，正在移除网站上的公开版本…' : '已移入回收站，可在左侧选择「回收站」恢复。';
+    if (result.deployment) watchDeployment(result.deployment.sha);
+    notice(`${kind}已移入回收站。`);
+  });
+};
+$('restore-entry').onclick = () => {
+  if (!active?.deletedAt) return;
+  withBusy(async () => {
+    const result = await api(`/api/entries/${active.id}/restore`, 'POST', { revision: active.revision });
+    entries = [result.entry, ...entries.filter(entry => entry.id !== result.entry.id)];
+    $('entry-filter').value = 'all'; openEntry(result.entry);
+    clearStatus(); $('publish-status').textContent = '已恢复为草稿。需要点击「发布到网站」才会重新公开。';
+    notice('已恢复为草稿。');
+  });
+};
 $('new-entry').onclick = () => openEntry(); $('entry-filter').onchange = renderList;
 $('entry-list').onclick = event => { const button = event.target.closest('[data-id]'); if (button) openEntry(entries.find(entry => entry.id === button.dataset.id)); };
 $('write-tab').onclick = () => selectTab(false); $('preview-tab').onclick = () => selectTab(true);
@@ -155,7 +190,8 @@ window.addEventListener('beforeunload', event => { if (dirty) { event.preventDef
 (async () => {
   try {
     const user = await api('/api/me');
-    $('visit-site').href = user.siteUrl; entries = await api('/api/entries');
+    $('visit-site').href = user.siteUrl;
+    const [current, trash] = await Promise.all([api('/api/entries'), api('/api/entries?trash=1')]); entries = [...current, ...trash];
     $('login-panel').hidden = true; $('workspace').hidden = false; $('logout').hidden = false; openEntry();
   } catch (error) { $('login-status').textContent = error.message; }
 })();

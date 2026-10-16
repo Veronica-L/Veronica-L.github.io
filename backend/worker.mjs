@@ -135,11 +135,12 @@ export function validateEntry(input) {
   if (/diary-image:/.test(text.replace(/!\[[^\]\n]*\]\(diary-image:[a-z0-9-]+\)/g, ''))) fail(400, '图片引用格式有误。');
   return { type: input.type, title, body: text, date, category: ['生活随笔', '技术手记', '旅行见闻'].includes(input.category) ? input.category : '生活随笔', tags: [...new Set((Array.isArray(input.tags) ? input.tags : []).map(t => String(t).trim()).filter(Boolean))].slice(0, 8).map(t => t.slice(0, 30)), images };
 }
-const entryResult = row => ({ ...JSON.parse(row.document), id: row.id, revision: row.revision, publishedRevision: row.published_revision, commitSha: row.commit_sha, updatedAt: row.updated_at });
-async function getEntry(env, id) {
+const entryResult = row => ({ ...JSON.parse(row.document), id: row.id, revision: row.revision, publishedRevision: row.published_revision, commitSha: row.commit_sha, updatedAt: row.updated_at, deletedAt: row.deleted_at || null });
+async function getEntry(env, id, includeDeleted = false) {
   if (!UUID.test(id)) fail(400, '记录编号无效。');
   const row = await env.DB.prepare('SELECT * FROM entries WHERE id = ?').bind(id).first();
   if (!row) fail(404, '记录不存在。');
+  if (row.deleted_at && !includeDeleted) fail(409, '此内容已在回收站，请先恢复后再编辑或发布。');
   return row;
 }
 async function saveEntry(request, env, id) {
@@ -151,7 +152,7 @@ async function saveEntry(request, env, id) {
   } else {
     await getEntry(env, id);
     if (!Number.isInteger(input.revision)) fail(400, '缺少记录版本，请刷新后重试。');
-    const result = await env.DB.prepare('UPDATE entries SET document = ?, revision = revision + 1, updated_at = ? WHERE id = ? AND revision = ?').bind(JSON.stringify(doc), now, id, input.revision).run();
+    const result = await env.DB.prepare('UPDATE entries SET document = ?, revision = revision + 1, updated_at = ? WHERE id = ? AND revision = ? AND deleted_at IS NULL').bind(JSON.stringify(doc), now, id, input.revision).run();
     if (!result.meta.changes) fail(409, '这篇内容已在其他窗口更新。请先备份正文，再刷新列表打开最新版本。');
   }
   return json(entryResult(await getEntry(env, id)));
@@ -165,14 +166,19 @@ async function upload(request, env) {
   return json({ id, url: `/api/media/${id}` }, 201);
 }
 function decodeContent(data) { return JSON.parse(new TextDecoder().decode(unb64(data.content.replace(/\s/g, '')))); }
-export async function publish(env, token, id, revision, unpublish = false) {
-  const entry = await getEntry(env, id), doc = JSON.parse(entry.document);
-  if (entry.revision !== revision) fail(409, '内容版本已更新，请刷新后重试。');
+async function withPublicationLock(env, action) {
   const holder = crypto.randomUUID();
   await env.DB.prepare("INSERT INTO locks (id, holder, expires_at) VALUES ('publish', ?, ?) ON CONFLICT(id) DO UPDATE SET holder = excluded.holder, expires_at = excluded.expires_at WHERE locks.expires_at < ?").bind(holder, Date.now() + 300000, Date.now()).run();
   const lock = await env.DB.prepare("SELECT holder FROM locks WHERE id = 'publish'").first();
   if (lock?.holder !== holder) fail(409, '另一项发布正在进行，请稍后重试。');
   try {
+    return await action();
+  } finally {
+    await env.DB.prepare("DELETE FROM locks WHERE id = 'publish' AND holder = ?").bind(holder).run();
+  }
+}
+async function commitPublication(env, token, entry, unpublish) {
+    const id = entry.id, revision = entry.revision, doc = JSON.parse(entry.document);
     const repo = repoPath(env), branch = encodeURIComponent(env.GITHUB_BRANCH || 'main');
     const ref = await github(env, token, `${repo}/git/ref/heads/${branch}`);
     const commit = await github(env, token, `${repo}/git/commits/${ref.object.sha}`);
@@ -206,9 +212,29 @@ export async function publish(env, token, id, revision, unpublish = false) {
     await github(env, token, `${repo}/git/refs/heads/${branch}`, 'PATCH', { sha: next.sha, force: false });
     await env.DB.prepare('UPDATE entries SET published_revision = ?, commit_sha = ? WHERE id = ?').bind(unpublish ? null : revision, next.sha, id).run();
     return { sha: next.sha, state: 'queued', siteUrl: env.SITE_URL, actionsUrl: `https://github.com/${env.GITHUB_OWNER}/${env.GITHUB_REPO}/actions` };
-  } finally {
-    await env.DB.prepare("DELETE FROM locks WHERE id = 'publish' AND holder = ?").bind(holder).run();
-  }
+}
+export async function publish(env, token, id, revision, unpublish = false) {
+  return withPublicationLock(env, async () => {
+    const entry = await getEntry(env, id);
+    if (entry.revision !== revision) fail(409, '内容版本已更新，请刷新后重试。');
+    return commitPublication(env, token, entry, unpublish);
+  });
+}
+async function trashEntry(request, env, token, id, restore = false) {
+  const input = await jsonBody(request);
+  if (!Number.isInteger(input.revision)) fail(400, '缺少记录版本，请刷新后重试。');
+  return withPublicationLock(env, async () => {
+    const entry = await getEntry(env, id, true);
+    if (entry.revision !== input.revision) fail(409, '内容已在其他窗口更新，请刷新列表后重试。');
+    if (restore ? !entry.deleted_at : Boolean(entry.deleted_at)) fail(409, restore ? '此内容不在回收站。' : '此内容已经在回收站。');
+    // Removing a published record must succeed before it leaves the normal list.
+    // Keep the draft and images untouched when GitHub rejects the update.
+    const deployment = !restore && entry.published_revision != null ? await commitPublication(env, token, entry, true) : null;
+    const now = new Date().toISOString();
+    const result = await env.DB.prepare('UPDATE entries SET deleted_at = ?, revision = revision + 1, updated_at = ? WHERE id = ? AND revision = ?').bind(restore ? null : now, now, id, input.revision).run();
+    if (!result.meta.changes) fail(409, '内容已在其他窗口更新，未移入回收站。请刷新后重试。');
+    return json({ entry: entryResult(await getEntry(env, id, true)), deployment });
+  });
 }
 async function handle(request, env) {
   const url = new URL(request.url), path = url.pathname;
@@ -225,12 +251,15 @@ async function handle(request, env) {
       return new Response('{}', { headers: { 'Content-Type': 'application/json', 'Set-Cookie': cookie(SESSION, '', 0) } });
     }
     if (path === '/api/entries' && request.method === 'GET') {
-      const rows = await env.DB.prepare('SELECT * FROM entries ORDER BY updated_at DESC LIMIT 500').all();
+      const rows = await env.DB.prepare(url.searchParams.get('trash') === '1' ? 'SELECT * FROM entries WHERE deleted_at IS NOT NULL ORDER BY updated_at DESC LIMIT 500' : 'SELECT * FROM entries WHERE deleted_at IS NULL ORDER BY updated_at DESC LIMIT 500').all();
       return json(rows.results.map(entryResult));
     }
     if (path === '/api/entries' && request.method === 'POST') return saveEntry(request, env);
     const match = /^\/api\/entries\/([a-z0-9-]+)$/.exec(path);
     if (match && request.method === 'PUT') return saveEntry(request, env, match[1]);
+    if (match && request.method === 'DELETE') return trashEntry(request, env, auth.token, match[1]);
+    const restore = /^\/api\/entries\/([a-z0-9-]+)\/restore$/.exec(path);
+    if (restore && request.method === 'POST') return trashEntry(request, env, auth.token, restore[1], true);
     if (path === '/api/media' && request.method === 'POST') return upload(request, env);
     const media = /^\/api\/media\/([a-z0-9-]+)$/.exec(path);
     if (media && request.method === 'GET') {

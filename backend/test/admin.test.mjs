@@ -9,7 +9,7 @@ const id = '11111111-1111-4111-8111-111111111111';
 const imageId = '22222222-2222-4222-8222-222222222222';
 const sha = 'a'.repeat(40), nextSha = 'b'.repeat(40);
 class TestDB {
-  constructor() { this.db = new DatabaseSync(':memory:'); this.db.exec(fs.readFileSync(new URL('../migrations/0001_admin.sql', import.meta.url), 'utf8')); }
+  constructor() { this.db = new DatabaseSync(':memory:'); for (const file of fs.readdirSync(new URL('../migrations/', import.meta.url)).sort()) this.db.exec(fs.readFileSync(new URL('../migrations/' + file, import.meta.url), 'utf8')); }
   prepare(sql) {
     const stmt = this.db.prepare(sql); let values = [];
     const wrapper = {
@@ -110,9 +110,8 @@ test('OAuth verifies state, uses PKCE, checks numeric owner and stores only encr
   const encrypted = rows.find(row => row.owner_id === env.OWNER_ID && row.encrypted_token);
   assert(await unseal(encrypted.encrypted_token, env));
 });
-function githubMock(env, { failRef = false } = {}) {
+function githubMock(env, { failRef = false, feed = { version: 1, posts: [{ id: 'preserved-public-entry', title: '保留的公开文章' }], diaries: [] } } = {}) {
   const calls = [];
-  const feed = { version: 1, posts: [{ id: 'preserved-public-entry', title: '保留的公开文章' }], diaries: [] };
   env.GITHUB_FETCH = async (input, options) => {
     const url = new URL(input); const body = options.body ? JSON.parse(options.body) : undefined; calls.push({ path: url.pathname, method: options.method, body });
     if (url.pathname.endsWith('/git/ref/heads/main')) return Response.json({ object: { sha } });
@@ -172,4 +171,76 @@ test('stale publication requests never contact GitHub', async () => {
   const { env, raw } = await fixture(); await insert(env);
   env.GITHUB_FETCH = () => { throw new Error('Stale version must not publish'); };
   assert.equal((await worker.fetch(req('/api/publish/' + id, { method: 'POST', raw, data: { revision: 0 } }), env)).status, 409);
+});
+test('deleting an unpublished article moves it to private trash without touching GitHub or media', async () => {
+  const { env, raw } = await fixture(); await insert(env, { ...doc, type: 'blog' });
+  env.GITHUB_FETCH = () => { throw new Error('Draft deletion must not contact GitHub'); };
+  const response = await worker.fetch(req('/api/entries/' + id, { method: 'DELETE', raw, data: { revision: 1 } }), env);
+  assert.equal(response.status, 200); const deleted = await response.json();
+  assert(deleted.entry.deletedAt); assert.equal(deleted.entry.revision, 2); assert.equal(deleted.deployment, null);
+  assert.deepEqual(await (await worker.fetch(req('/api/entries', { raw }), env)).json(), []);
+  const trash = await (await worker.fetch(req('/api/entries?trash=1', { raw }), env)).json();
+  assert.equal(trash.length, 1); assert.equal(trash[0].body, doc.body);
+});
+test('deleted content cannot be edited, published or deleted twice, and restoration does not republish it', async () => {
+  const { env, raw } = await fixture(); await insert(env);
+  await worker.fetch(req('/api/entries/' + id, { method: 'DELETE', raw, data: { revision: 1 } }), env);
+  for (const [path, method, data] of [
+    ['/api/entries/' + id, 'PUT', { ...doc, revision: 2 }],
+    ['/api/publish/' + id, 'POST', { revision: 2 }],
+    ['/api/entries/' + id, 'DELETE', { revision: 2 }],
+  ]) assert.equal((await worker.fetch(req(path, { method, raw, data }), env)).status, 409);
+  env.GITHUB_FETCH = () => { throw new Error('Restore must not publish'); };
+  const restored = await worker.fetch(req('/api/entries/' + id + '/restore', { method: 'POST', raw, data: { revision: 2 } }), env);
+  assert.equal(restored.status, 200); const entry = (await restored.json()).entry;
+  assert.equal(entry.deletedAt, null); assert.equal(entry.publishedRevision, null); assert.equal(entry.revision, 3);
+  assert.equal((await worker.fetch(req('/api/entries/' + id, { method: 'PUT', raw, data: { ...doc, revision: 1 } }), env)).status, 409);
+  const saved = await worker.fetch(req('/api/entries/' + id, { method: 'PUT', raw, data: { ...doc, revision: 3 } }), env);
+  assert.equal(saved.status, 200);
+});
+test('deleting a published record removes just that record and retains images for restoration', async () => {
+  const { env, raw } = await fixture(); await insert(env, { ...doc, type: 'blog' });
+  await env.DB.prepare('UPDATE entries SET published_revision = 1 WHERE id = ?').bind(id).run();
+  await env.DB.prepare('INSERT INTO media VALUES (?, ?, ?)').bind(imageId, new Uint8Array([255, 216, 255, 217]), 'now').run();
+  const calls = githubMock(env, { feed: { version: 1, posts: [{ id, title: doc.title }, { id: 'keep' }], diaries: [{ id: 'keep-diary' }] } });
+  const response = await worker.fetch(req('/api/entries/' + id, { method: 'DELETE', raw, data: { revision: 1 } }), env);
+  assert.equal(response.status, 200); const result = await response.json();
+  assert.equal(result.deployment.sha, nextSha); assert(result.entry.deletedAt); assert.equal(result.entry.publishedRevision, null);
+  const tree = calls.find(call => call.path.endsWith('/git/trees')).body.tree;
+  assert.deepEqual(tree.map(item => item.path), ['content/feed.json']);
+  const feed = JSON.parse(tree[0].content); assert.deepEqual(feed.posts.map(item => item.id), ['keep']); assert.equal(feed.diaries[0].id, 'keep-diary');
+  assert(await env.DB.prepare('SELECT id FROM media WHERE id = ?').bind(imageId).first());
+});
+test('failed public removal and stale deletion leave the original article in the normal list', async () => {
+  const { env, raw } = await fixture(); await insert(env);
+  await env.DB.prepare('UPDATE entries SET published_revision = 1 WHERE id = ?').bind(id).run();
+  githubMock(env, { failRef: true });
+  assert.equal((await worker.fetch(req('/api/entries/' + id, { method: 'DELETE', raw, data: { revision: 0 } }), env)).status, 409);
+  assert.equal((await worker.fetch(req('/api/entries/' + id, { method: 'DELETE', raw, data: { revision: 1 } }), env)).status, 409);
+  const list = await (await worker.fetch(req('/api/entries', { raw }), env)).json();
+  assert.equal(list.length, 1); assert.equal(list[0].revision, 1); assert.equal(list[0].publishedRevision, 1); assert.equal(list[0].deletedAt, null);
+});
+test('trash and restore endpoints require owner authentication and CSRF protection', async () => {
+  const { env, raw } = await fixture(); await insert(env);
+  for (const [path, method] of [['/api/entries/' + id, 'DELETE'], ['/api/entries/' + id + '/restore', 'POST']]) {
+    assert.equal((await worker.fetch(req(path, { method, data: { revision: 1 } }), env)).status, 401);
+    assert.equal((await worker.fetch(req(path, { method, raw, data: { revision: 1 }, headers: { Origin: 'https://attacker.example' } }), env)).status, 403);
+  }
+  assert.equal((await worker.fetch(req('/api/entries?trash=1'), env)).status, 401);
+});
+test('delete waits for an in-flight publication and concurrent edits are never discarded', async () => {
+  const { env, raw } = await fixture(); await insert(env);
+  await env.DB.prepare('INSERT INTO locks VALUES (?, ?, ?)').bind('publish', 'active-publisher', Date.now() + 60000).run();
+  assert.equal((await worker.fetch(req('/api/entries/' + id, { method: 'DELETE', raw, data: { revision: 1 } }), env)).status, 409);
+  await env.DB.prepare("DELETE FROM locks WHERE id = 'publish'").run();
+  await env.DB.prepare('UPDATE entries SET published_revision = 1 WHERE id = ?').bind(id).run();
+  githubMock(env);
+  const original = env.GITHUB_FETCH;
+  env.GITHUB_FETCH = async (url, options) => {
+    if (options.method === 'PATCH') await env.DB.prepare('UPDATE entries SET revision = 2 WHERE id = ?').bind(id).run();
+    return original(url, options);
+  };
+  assert.equal((await worker.fetch(req('/api/entries/' + id, { method: 'DELETE', raw, data: { revision: 1 } }), env)).status, 409);
+  const entry = await env.DB.prepare('SELECT * FROM entries WHERE id = ?').bind(id).first();
+  assert.equal(entry.deleted_at, null); assert.equal(entry.revision, 2);
 });
