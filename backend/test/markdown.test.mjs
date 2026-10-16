@@ -70,7 +70,7 @@ test('the actual admin Preview button renders a table using the shared renderer'
 });
 test('public article and diary views render the same table as the admin preview', () => {
   const dom = page(fs.readFileSync(new URL('index.html', root), 'utf8'));
-  for (const file of ['diary-media.js', 'diary-ui.js', 'home-view.js', 'app.js']) run(dom, file);
+  for (const file of ['diary-media.js', 'diary-ui.js', 'home-view.js', 'sample-posts.js', 'app.js']) run(dom, file);
   dom.window.sample = { title: '表格', body: table, id: 'test-entry' };
   const article = vm.runInContext('articleBody(sample)', dom.getInternalVMContext());
   const diary = vm.runInContext('diaryUI.body(sample)', dom.getInternalVMContext());

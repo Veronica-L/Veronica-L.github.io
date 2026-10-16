@@ -13,6 +13,15 @@ function postCover(post) {
   return `assets/${covers[post.id] || post.image || 'reference-flowers'}.jpg`;
 }
 
+function postUrl(post) {
+  return post && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(post.id) && (post.published || initialPosts.some(sample => sample.id === post.id)) ? `posts/${post.id}/` : null;
+}
+
+function navigateArticle(id) {
+  const post = posts.find(item => item.id === id), url = postUrl(post);
+  if (url) location.assign(url); else openArticle(id);
+}
+
 function viewCounter(post) {
   if (!post.published && !initialPosts.some(sample => sample.id === post.id)) return '';
   return `<div class="view-count">浏览量 <span data-view-target="article:${e(post.id)}" aria-live="polite">—</span></div>`;
@@ -30,8 +39,8 @@ const artHome = {
       </header>
       <section class="cover-grid" aria-label="首页精选">
         <article class="lead-story keyboard-card" role="button" tabindex="0" data-post="${e(lead.id)}" aria-label="阅读 ${e(lead.title)}">
-          <div class="lead-image"><img src="${postCover(lead)}" alt="海浪、地图与色块的复古拼贴"><span class="cover-stamp">SELECTED<br><b>01</b></span><span class="cover-caption">ARTICLE / ${dateDisplay(lead.date)}</span></div>
-          <div class="lead-copy"><div class="article-meta"><span class="category">置顶文章 / ${e(lead.category)}</span><time datetime="${lead.date}">${dateDisplay(lead.date)}</time></div><h2>${e(lead.title)}</h2><div class="lead-bottom">${renderTags(lead)}<span class="lead-read">阅读文章 ${icon('arrowUpRight')}</span></div>${viewCounter(lead)}</div>
+          <a class="lead-image" href="${postUrl(lead)}"><img src="${postCover(lead)}" alt="${e(lead.title)}的配图"><span class="cover-stamp">SELECTED<br><b>01</b></span><span class="cover-caption">ARTICLE / ${dateDisplay(lead.date)}</span></a>
+          <div class="lead-copy"><div class="article-meta"><span class="category">置顶文章 / ${e(lead.category)}</span><time datetime="${lead.date}">${dateDisplay(lead.date)}</time></div><h2><a href="${postUrl(lead)}">${e(lead.title)}</a></h2><div class="lead-bottom">${renderTags(lead)}<a class="lead-read" href="${postUrl(lead)}">阅读文章 ${icon('arrowUpRight')}</a></div>${viewCounter(lead)}</div>
         </article>
         <div class="cover-side">
           <section class="cover-diary"><div class="section-heading"><h2>${icon('notebook')}最近日记</h2><a href="#diary">全部 ${icon('arrowUpRight')}</a></div><div class="cover-date"><b>${diary.date.slice(8)}</b><span>${diary.date.slice(0, 4)} / ${diary.date.slice(5, 7)}</span><span class="diary-number">DIARY / 01</span></div><p>${e(diaryMedia.text(diary.body).split('\n\n')[0] || '这篇日记包含图片。')}</p><a href="#diary" class="cover-diary-link">查看日记 ${icon('arrowRight')}</a></section>

@@ -10,7 +10,7 @@ function publicPage(url = 'https://veronica-l.github.io/') {
   const dom = new JSDOM(fs.readFileSync(new URL('index.html', root), 'utf8'), { url, runScripts: 'outside-only' });
   dom.window.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
   dom.window.HTMLDialogElement.prototype.close = function () { this.open = false; };
-  for (const file of ['vendor/marked.umd.js', 'vendor/purify.min.js', 'markdown-renderer.js', 'diary-media.js', 'diary-ui.js', 'home-view.js', 'app.js', 'site-config.js']) run(dom, file);
+  for (const file of ['vendor/marked.umd.js', 'vendor/purify.min.js', 'markdown-renderer.js', 'diary-media.js', 'diary-ui.js', 'home-view.js', 'sample-posts.js', 'app.js', 'site-config.js']) run(dom, file);
   return dom;
 }
 test('real homepage/card/article counters share live counts; rerenders and repeat opens do not send duplicate visits', async () => {

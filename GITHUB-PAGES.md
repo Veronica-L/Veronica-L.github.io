@@ -41,3 +41,12 @@ npm run build
 - 公开部署时，GitHub 账号名可能从仓库和默认网址中被看到；提交前还应检查 Git 提交作者和邮箱的公开设置。
 
 官方说明：[GitHub Pages](https://docs.github.com/en/pages/getting-started-with-github-pages/what-is-github-pages)、[自定义部署工作流](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages)。
+## 独立文章网页
+
+每次构建都会从 `content/feed.json` 中的已发布文章生成 `/posts/<固定文章编号>/index.html`，标题、完整正文、表格和图片地址直接写入 HTML。页面不依赖后台 API 或 JavaScript 来读取正文；Mermaid 图和浏览量为附加增强，图表源码在原始页面中保留。修改文章标题不会改变网址。
+
+首页原始 HTML 包含已发布文章的链接与摘要；首页、文章列表、搜索和归档的公开文章入口使用普通链接。`sitemap.xml` 仅列出首页及真正发布的文章，`robots.txt` 提供站点地图地址。示例文章也有独立页面，但标记为不收录。本地浏览器里的私有草稿仍在本地阅读，不参与静态构建。
+
+后台发布或更新文章后，现有 GitHub Actions 自动重新生成网页；撤下／删除后，下一次成功部署会移除对应 HTML 和站点地图项。旧的公开 Git 历史不因此清除。生成网页位于忽略提交的 `dist/`，不会重复写入源码仓库。
+
+本地预览独立页面：先执行 `npm run build`，再设置 `KIKI_PREVIEW_DIST=1` 并运行 `npm run dev`。静态页面使用当前用户站点根路径，部署目标仍为 `https://veronica-l.github.io/`。

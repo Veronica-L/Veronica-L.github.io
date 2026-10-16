@@ -47,5 +47,6 @@
     article(id) { hydrate(); visit('article:' + id); },
   });
   const initial = (location.hash.slice(1) || 'home').split('?')[0];
-  window.kikiAnalytics.page(pages.has(initial) ? initial : 'home');
+  if (document.body.dataset.articleId) window.kikiAnalytics.article(document.body.dataset.articleId);
+  else window.kikiAnalytics.page(pages.has(initial) ? initial : 'home');
 })();
