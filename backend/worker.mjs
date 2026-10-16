@@ -35,13 +35,15 @@ export async function unseal(value, env) {
   const [iv, data] = String(value).split('.').map(s => unb64(s.replaceAll('-', '+').replaceAll('_', '/')));
   return JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, await secretKey(env), data)));
 }
-export function protect(response) {
+export function protect(response, diagram = false) {
   const result = new Response(response.body, response);
   result.headers.set('Cache-Control', 'no-store');
   result.headers.set('X-Content-Type-Options', 'nosniff');
   result.headers.set('Referrer-Policy', 'no-referrer');
-  result.headers.set('X-Frame-Options', 'DENY');
-  result.headers.set('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
+  result.headers.set('X-Frame-Options', diagram ? 'SAMEORIGIN' : 'DENY');
+  result.headers.set('Content-Security-Policy', diagram
+    ? "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; frame-ancestors 'self'; form-action 'none'"
+    : "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
   return result;
 }
 async function body(request, limit = 150000) {
@@ -284,12 +286,18 @@ async function handle(request, env) {
   if (request.method !== 'GET' && request.method !== 'HEAD') fail(405, '不支持此操作。');
   if (path === '/') return Response.redirect(new URL('/admin', request.url), 302);
   if (path === '/admin' || path === '/admin/') return env.ASSETS.fetch(new Request(new URL('/', request.url), request));
-  if (['/admin.js', '/admin.css', '/markdown-renderer.js', '/markdown.css', '/vendor/marked.umd.js', '/vendor/purify.min.js'].includes(path)) return env.ASSETS.fetch(request);
+  if (['/admin.js', '/admin.css', '/markdown-renderer.js', '/markdown.css', '/mermaid-client.js', '/diagram.html', '/diagram.css', '/diagram-frame.mjs', '/vendor/marked.umd.js', '/vendor/purify.min.js'].includes(path) || /^\/vendor\/mermaid\/[a-zA-Z0-9_./-]+\.mjs$/.test(path)) {
+    const asset = await env.ASSETS.fetch(request);
+    const response = new Response(asset.body, asset);
+    // Public renderer modules are usable by opaque-origin sandbox frames.
+    response.headers.set('Access-Control-Allow-Origin', '*');
+    return response;
+  }
   fail(404, '页面不存在。');
 }
 export default {
   async fetch(request, env) {
-    try { return protect(await handle(request, env)); }
+    try { return protect(await handle(request, env), new URL(request.url).pathname === '/diagram.html'); }
     catch (error) { return protect(json({ error: error instanceof HttpError ? error.message : '服务暂时无法完成操作，请稍后重试。' }, error instanceof HttpError ? error.status : 500)); }
   },
 };

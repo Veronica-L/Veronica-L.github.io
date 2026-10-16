@@ -58,7 +58,10 @@ function prose(text) {
 function selectTab(preview) {
   $('body').hidden = preview; $('preview').hidden = !preview;
   $('write-tab').classList.toggle('selected', !preview); $('preview-tab').classList.toggle('selected', preview);
-  if (preview) $('preview').innerHTML = `<h1>${escape($('title').value)}</h1>` + prose($('body').value);
+  if (preview) {
+    $('preview').innerHTML = `<h1>${escape($('title').value)}</h1>` + prose($('body').value);
+    window.kikiDiagrams?.render($('preview'));
+  }
 }
 async function withBusy(action) {
   if (busy) return;

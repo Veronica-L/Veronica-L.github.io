@@ -8,6 +8,10 @@ node_modules/
 backend/public/vendor/
 backend/public/markdown-renderer.js
 backend/public/markdown.css
+backend/public/mermaid-client.js
+backend/public/diagram.html
+backend/public/diagram.css
+backend/public/diagram-frame.mjs
 .tools/
 *.log
 
